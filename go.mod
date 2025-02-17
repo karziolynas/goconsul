@@ -1,4 +1,4 @@
-module github.com/kariolynas/goconsul
+module github.com/karziolynas/goconsul
 
 go 1.24.0
 
