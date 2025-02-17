@@ -22,6 +22,8 @@ type Service struct {
 	port         int
 }
 
+//Registers a new consul client based on provided arguments
+//Returns a Service struct with a pointer to the consul client 
 func NewService(serviceID string, serviceName string, address string, port int) *Service {
 	client, err := api.NewClient(
 		&api.Config{})
