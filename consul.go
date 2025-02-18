@@ -24,7 +24,7 @@ type Service struct {
 
 // Registers a new consul client based on provided arguments.
 // Returns a Service struct with a pointer to the consul client.
-func NewService(serviceID string, serviceName string, address string, port int) (*Service, int) {
+func NewService(serviceID string, serviceName string, address string, port int) *Service {
 	client, err := api.NewClient(
 		&api.Config{})
 	if err != nil {
@@ -37,7 +37,7 @@ func NewService(serviceID string, serviceName string, address string, port int) 
 		name:         serviceName,
 		address:      address,
 		port:         port,
-	}, 0
+	}
 }
 
 // Registers the service to consul and starts the basic health check.
