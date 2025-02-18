@@ -54,9 +54,10 @@ func (s *Service) Start() {
 
 // Updates the service's health/TTL
 func (s *Service) updateHealthCheck() {
+	checkId := checkID + "_" + s.id
 	ticker := time.NewTicker(time.Second * 5)
 	for {
-		err := s.consulClient.Agent().UpdateTTL(checkID, "online", api.HealthPassing)
+		err := s.consulClient.Agent().UpdateTTL(checkId, "online", api.HealthPassing)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -79,7 +80,7 @@ func (s *Service) registerServiceConsul() {
 			DeregisterCriticalServiceAfter: ttl.String(),
 			TLSSkipVerify:                  true,
 			TTL:                            ttl.String(),
-			CheckID:                        checkID,
+			CheckID:                        checkID + "_" + s.id,
 		},
 	}
 
