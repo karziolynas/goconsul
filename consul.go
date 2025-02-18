@@ -31,21 +31,6 @@ func NewService(serviceID string, serviceName string, address string, port int) 
 		log.Fatal(err)
 	}
 
-	filterString := fmt.Sprintf("ServiceID==%s,ServicePort==%v", serviceID, port)
-	services, err := client.Agent().ServicesWithFilter(filterString)
-	if err != nil {
-		log.Fatal(err)
-	}
-
-	for _, value := range services {
-		if value.ID == serviceID {
-			return nil, -1
-		}
-		if value.Port == port {
-			return nil, -2
-		}
-	}
-
 	return &Service{
 		consulClient: client,
 		id:           serviceID,
