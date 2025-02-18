@@ -22,23 +22,43 @@ type Service struct {
 	port         int
 }
 
-//Registers a new consul client based on provided arguments
-//Returns a Service struct with a pointer to the consul client 
-func NewService(serviceID string, serviceName string, address string, port int) *Service {
+// Registers a new consul client based on provided arguments.
+// Returns a Service struct with a pointer to the consul client.
+func NewService(serviceID string, serviceName string, address string, port int) (*Service, int) {
 	client, err := api.NewClient(
 		&api.Config{})
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	filterString := fmt.Sprintf("ServiceAddress=%s,ServiceID=%s,ServicePort=%v", address, serviceID, port)
+	services, err := client.Agent().ServicesWithFilter(filterString)
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for _, value := range services {
+		if value.Address == address {
+			return nil, -1
+		}
+		if value.ID == serviceID {
+			return nil, -2
+		}
+		if value.Port == port {
+			return nil, -3
+		}
+	}
+
 	return &Service{
 		consulClient: client,
 		id:           serviceID,
 		name:         serviceName,
 		address:      address,
 		port:         port,
-	}
+	}, 0
 }
 
+// Registers the service to consul and starts the basic health check.
 func (s *Service) Start() {
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -50,6 +70,7 @@ func (s *Service) Start() {
 	wg.Wait()
 }
 
+// Updates the service's health/TTL
 func (s *Service) updateHealthCheck() {
 	ticker := time.NewTicker(time.Second * 5)
 	for {
@@ -63,6 +84,7 @@ func (s *Service) updateHealthCheck() {
 
 }
 
+// Registers the service to consul.
 func (s *Service) registerServiceConsul() {
 
 	register := &api.AgentServiceRegistration{
@@ -84,6 +106,15 @@ func (s *Service) registerServiceConsul() {
 	}
 
 	fmt.Printf("Service - '%v' registered! \n", s.id)
+}
+
+func (s *Service) ServiceAddressCheck(address string, id string, port string) map[string]*api.AgentService {
+	filterString := fmt.Sprintf("ServiceAddress=%s,ServiceID=%s,ServicePort=%s", address, id, port)
+	services, err := s.consulClient.Agent().ServicesWithFilter(filterString)
+	if err != nil {
+		log.Fatal(err)
+	}
+	return services
 }
 
 func (s *Service) ServiceDiscovery(serviceName string) {
