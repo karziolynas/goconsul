@@ -31,7 +31,7 @@ func NewService(serviceID string, serviceName string, address string, port int) 
 		log.Fatal(err)
 	}
 
-	filterString := fmt.Sprintf("ServiceAddress=%s,ServiceID=%s,ServicePort=%v", address, serviceID, port)
+	filterString := fmt.Sprintf("ServiceAddress==%s,ServiceID==%s,ServicePort==%v", address, serviceID, port)
 	services, err := client.Agent().ServicesWithFilter(filterString)
 	if err != nil {
 		log.Fatal(err)
