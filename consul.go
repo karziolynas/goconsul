@@ -38,14 +38,11 @@ func NewService(serviceID string, serviceName string, address string, port int) 
 	}
 
 	for _, value := range services {
-		if value.Address == address {
+		if value.ID == serviceID {
 			return nil, -1
 		}
-		if value.ID == serviceID {
-			return nil, -2
-		}
 		if value.Port == port {
-			return nil, -3
+			return nil, -2
 		}
 	}
 
