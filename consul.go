@@ -58,12 +58,11 @@ func (s *Service) Start() {
 func (s *Service) registerServiceConsul() {
 
 	register := &api.AgentServiceRegistration{
-		ID:        s.id,
-		Name:      s.name,
-		Tags:      s.tags,
-		Address:   s.address,
-		Port:      s.port,
-		Namespace: "consul_weather_Service",
+		ID:      s.id,
+		Name:    s.name,
+		Tags:    s.tags,
+		Address: s.address,
+		Port:    s.port,
 		Check: &api.AgentServiceCheck{
 			DeregisterCriticalServiceAfter: ttl.String(),
 			TLSSkipVerify:                  true,
