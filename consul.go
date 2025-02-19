@@ -20,11 +20,12 @@ type Service struct {
 	name         string
 	address      string
 	port         int
+	tags         []string
 }
 
 // Registers a new consul client based on provided arguments.
 // Returns a Service struct with a pointer to the consul client.
-func NewService(serviceID string, serviceName string, address string, port int) *Service {
+func NewService(serviceID string, serviceName string, address string, port int, tags []string) *Service {
 	client, err := api.NewClient(
 		&api.Config{})
 	if err != nil {
@@ -37,10 +38,11 @@ func NewService(serviceID string, serviceName string, address string, port int) 
 		name:         serviceName,
 		address:      address,
 		port:         port,
+		tags:         tags,
 	}
 }
 
-// Registers the service to consul and starts the basic health check.
+// Registers the service to consul and starts the basic TTL health check.
 func (s *Service) Start() {
 	var wg sync.WaitGroup
 	wg.Add(1)
@@ -50,6 +52,31 @@ func (s *Service) Start() {
 
 	defer wg.Done()
 	wg.Wait()
+}
+
+// Registers the service to consul.
+func (s *Service) registerServiceConsul() {
+
+	register := &api.AgentServiceRegistration{
+		ID:        s.id,
+		Name:      s.name,
+		Tags:      s.tags,
+		Address:   s.address,
+		Port:      s.port,
+		Namespace: "consul_weather_Service",
+		Check: &api.AgentServiceCheck{
+			DeregisterCriticalServiceAfter: ttl.String(),
+			TLSSkipVerify:                  true,
+			TTL:                            ttl.String(),
+			CheckID:                        checkID + "_" + s.id,
+		},
+	}
+
+	if err := s.consulClient.Agent().ServiceRegister(register); err != nil {
+		log.Fatal(err)
+	}
+
+	fmt.Printf("Service - '%v' registered! \n", s.id)
 }
 
 // Updates the service's health/TTL
@@ -67,32 +94,8 @@ func (s *Service) updateHealthCheck() {
 
 }
 
-// Registers the service to consul.
-func (s *Service) registerServiceConsul() {
-
-	register := &api.AgentServiceRegistration{
-		ID:      s.id,
-		Name:    s.name,
-		Tags:    []string{"test"},
-		Address: s.address,
-		Port:    s.port,
-		Check: &api.AgentServiceCheck{
-			DeregisterCriticalServiceAfter: ttl.String(),
-			TLSSkipVerify:                  true,
-			TTL:                            ttl.String(),
-			CheckID:                        checkID + "_" + s.id,
-		},
-	}
-
-	if err := s.consulClient.Agent().ServiceRegister(register); err != nil {
-		log.Fatal(err)
-	}
-
-	fmt.Printf("Service - '%v' registered! \n", s.id)
-}
-
-func (s *Service) ServiceAddressCheck(address string, id string, port string) map[string]*api.AgentService {
-	filterString := fmt.Sprintf("ServiceAddress=%s,ServiceID=%s,ServicePort=%s", address, id, port)
+func (s *Service) ServiceAddressCheck(id string, port string) map[string]*api.AgentService {
+	filterString := fmt.Sprintf("ServiceID=%s,ServicePort=%s", id, port)
 	services, err := s.consulClient.Agent().ServicesWithFilter(filterString)
 	if err != nil {
 		log.Fatal(err)
