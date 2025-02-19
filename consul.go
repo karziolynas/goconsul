@@ -102,15 +102,15 @@ func (s *Service) ServiceAddressCheck(id string, port string) map[string]*api.Ag
 	return services
 }
 
-func (s *Service) ServiceDiscovery(serviceName string) {
-	services, _, err := s.consulClient.Health().Service(serviceName, "", true, nil)
+func (s *Service) ServiceDiscovery() {
+	services, err := s.consulClient.Agent().Services()
 	if err != nil {
 		log.Fatal(err)
 	}
 
 	for _, entry := range services {
 		fmt.Printf("Service: %s | Address: %s | Port: %d \n",
-			entry.Service.Service, entry.Node.Address, entry.Service.Port)
+			entry.Service, entry.Address, entry.Port)
 	}
 }
 
