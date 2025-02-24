@@ -27,7 +27,9 @@ type Service struct {
 // Returns a Service struct with a pointer to the consul client.
 func NewService(serviceID string, serviceName string, address string, port int, tags []string) *Service {
 	client, err := api.NewClient(
-		&api.Config{})
+		&api.Config{
+			Address: "127.0.0.1",
+		})
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -64,10 +66,10 @@ func (s *Service) registerServiceConsul() {
 		Address: s.address,
 		Port:    s.port,
 		Check: &api.AgentServiceCheck{
-			DeregisterCriticalServiceAfter: ttl.String(),
-			TLSSkipVerify:                  true,
-			TTL:                            ttl.String(),
-			CheckID:                        checkID + "_" + s.id,
+			//DeregisterCriticalServiceAfter: ttl.String(),
+			TLSSkipVerify: true,
+			TTL:           ttl.String(),
+			CheckID:       checkID + "_" + s.id,
 		},
 	}
 
@@ -110,7 +112,7 @@ func (s *Service) ServiceDiscovery() {
 
 	for _, entry := range services {
 		fmt.Printf("Service: %s | Address: %s | Port: %d \n",
-			entry.Service, entry.Address, entry.Port)
+			entry.ID, entry.Address, entry.Port)
 	}
 }
 
