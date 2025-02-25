@@ -28,7 +28,7 @@ type Service struct {
 func NewService(serviceID string, serviceName string, address string, port int, tags []string) *Service {
 	client, err := api.NewClient(
 		&api.Config{
-			Address: "host.docker.internal",
+			Address: "host.docker.internal:8500",
 		})
 	if err != nil {
 		log.Fatal(err)
