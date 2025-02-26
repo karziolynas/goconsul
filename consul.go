@@ -114,7 +114,7 @@ func (s *Service) ServiceAddressCheck(port *int) {
 
 // Returns an available id for service
 func (s *Service) ServiceIDCheck(id *string) {
-	filterString := fmt.Sprintf("?filter=ID==%s", *id)
+	filterString := fmt.Sprintf("ID == %s", *id)
 	services, err := s.consulClient.Agent().ServicesWithFilter(filterString)
 	if err != nil {
 		log.Fatal(err)
