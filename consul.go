@@ -3,6 +3,8 @@ package goconsul
 import (
 	"fmt"
 	"log"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,7 +13,7 @@ import (
 
 const (
 	ttl     = time.Second * 8
-	checkID = "check_health"
+	checkID = "check_TTL"
 )
 
 type Service struct {
@@ -48,6 +50,7 @@ func NewService(serviceID string, serviceName string, address string, port int, 
 func (s *Service) Start() {
 	var wg sync.WaitGroup
 	wg.Add(1)
+	s.ServiceIDCheck(&s.id)
 	s.registerServiceConsul()
 
 	go s.updateHealthCheck()
@@ -66,7 +69,6 @@ func (s *Service) registerServiceConsul() {
 		Address: s.address,
 		Port:    s.port,
 		Check: &api.AgentServiceCheck{
-			//DeregisterCriticalServiceAfter: ttl.String(),
 			TLSSkipVerify: true,
 			TTL:           ttl.String(),
 			CheckID:       checkID + "_" + s.id,
@@ -85,7 +87,7 @@ func (s *Service) updateHealthCheck() {
 	checkId := checkID + "_" + s.id
 	ticker := time.NewTicker(time.Second * 5)
 	for {
-		err := s.consulClient.Agent().UpdateTTL(checkId, "online", api.HealthPassing)
+		err := s.consulClient.Agent().UpdateTTL(checkId, "Service TTL updated", api.HealthPassing)
 		if err != nil {
 			log.Fatal(err)
 		}
@@ -95,13 +97,37 @@ func (s *Service) updateHealthCheck() {
 
 }
 
-func (s *Service) ServiceAddressCheck(id string, port string) map[string]*api.AgentService {
-	filterString := fmt.Sprintf("ServiceID=%s,ServicePort=%s", id, port)
+// doesnt make sense - docker already notifies if port is in use
+func (s *Service) ServiceAddressCheck(port *int) {
+	services, err := s.consulClient.Agent().Services()
+	if err != nil {
+		log.Fatal(err)
+	}
+	for _, entry := range services {
+		if *port == entry.Port {
+			*port++
+			fmt.Printf("Port - %v already in use, changed to - %v \n", entry.Port, *port)
+		}
+	}
+
+}
+
+// Returns an available id for service
+func (s *Service) ServiceIDCheck(id *string) {
+	filterString := fmt.Sprintf("?filter=ID==%s", *id)
 	services, err := s.consulClient.Agent().ServicesWithFilter(filterString)
 	if err != nil {
 		log.Fatal(err)
 	}
-	return services
+	baseValue := 1
+	for _, entry := range services {
+		if *id == entry.ID {
+			*id = strings.Replace(*id, strconv.Itoa(baseValue), strconv.Itoa(baseValue+1), 1)
+			fmt.Printf("ID - %s already in use, changed to - %s \n", entry.ID, *id)
+		}
+		baseValue++
+	}
+
 }
 
 func (s *Service) ServiceDiscovery() {
