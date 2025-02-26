@@ -27,10 +27,10 @@ type Service struct {
 
 // Registers a new consul client based on provided arguments.
 // Returns a Service struct with a pointer to the consul client.
-func NewService(serviceID string, serviceName string, address string, port int, tags []string) *Service {
+func NewService(consulAddress string, serviceID string, serviceName string, address string, port int, tags []string) *Service {
 	client, err := api.NewClient(
 		&api.Config{
-			Address: "host.docker.internal:8500",
+			Address: consulAddress,
 		})
 	if err != nil {
 		log.Fatal(err)
