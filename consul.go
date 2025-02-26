@@ -82,7 +82,7 @@ func (s *Service) registerServiceConsul() {
 	fmt.Printf("Service - '%v' registered! \n", s.id)
 }
 
-// Updates the service's health/TTL
+// Updates the service's health/TTL.
 func (s *Service) updateHealthCheck() {
 	checkId := checkID + "_" + s.id
 	ticker := time.NewTicker(time.Second * 5)
