@@ -50,7 +50,7 @@ func NewService(consulAddress string, serviceID string, serviceName string, addr
 func (s *Service) Start() {
 	var wg sync.WaitGroup
 	wg.Add(1)
-	s.ServiceIDCheck(&s.id)
+	//s.ServiceIDCheck(&s.id)
 	s.registerServiceConsul()
 
 	go s.updateHealthCheck()
@@ -112,9 +112,10 @@ func (s *Service) ServiceAddressCheck(port *int) {
 
 }
 
-// Returns an available id for service
+// testing if automating a pick for service ID is worth it
+// method would check if service id exists and change it something else
 func (s *Service) ServiceIDCheck(id *string) {
-	filterString := fmt.Sprintf("ID == %s", *id)
+	filterString := fmt.Sprintf("ID contains %s", *id)
 	services, err := s.consulClient.Agent().ServicesWithFilter(filterString)
 	if err != nil {
 		log.Fatal(err)
