@@ -109,7 +109,7 @@ func (s *Service) registerServiceConsul(serviceAddr string, servicePort string) 
 
 // Updates the service's health/TTL.
 func (s *Service) updateHealthCheck() {
-	checkId := checkID + "_" + s.id
+	checkId := checkID + "_TTL_" + s.id
 	ticker := time.NewTicker(time.Second * 5)
 	for {
 		err := s.consulClient.Agent().UpdateTTL(checkId, "Service TTL updated", api.HealthPassing)
