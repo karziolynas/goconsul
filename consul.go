@@ -144,8 +144,9 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 		"service":      s.name,
 		"handler_type": "http",
 		"http_handler_config": map[string]interface{}{
-			"path":   handlerURL,
-			"method": "POST",
+			"path":            handlerURL,
+			"method":          "POST",
+			"tls_skip_verify": true,
 		},
 	}
 
