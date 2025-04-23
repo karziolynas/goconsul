@@ -3,6 +3,7 @@ package goconsul
 import (
 	"fmt"
 	"log"
+	"net/url"
 	"strconv"
 	"strings"
 	"sync"
@@ -62,6 +63,21 @@ func (s *Service) Start(consulAddress string, serviceAddr string) {
 
 // Registers the service to consul.
 func (s *Service) registerServiceConsul(serviceAddr string) {
+	var httpEndpoint, tcpAddress string
+
+	if strings.HasPrefix(serviceAddr, "http") {
+		httpEndpoint = serviceAddr
+		parsedURL, err := url.Parse(serviceAddr)
+		if err != nil {
+			log.Printf("Warning: Could not parse URL %s: %v", serviceAddr, err)
+			tcpAddress = s.address + ":" + strconv.Itoa(s.port)
+		} else {
+			tcpAddress = parsedURL.Host
+		}
+	} else {
+		httpEndpoint = fmt.Sprintf("http://%s:%d%s", s.address, s.port, serviceAddr)
+		tcpAddress = fmt.Sprintf("%s:%d", s.address, s.port)
+	}
 
 	CheckTTL := &api.AgentServiceCheck{
 		CheckID:                checkID + "_TTL_" + s.id,
@@ -72,7 +88,7 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 	}
 	CheckHTTP := &api.AgentServiceCheck{
 		CheckID:                checkID + "_HTTP_" + s.id,
-		HTTP:                   serviceAddr,
+		HTTP:                   httpEndpoint,
 		TLSSkipVerify:          true,
 		Method:                 "GET",
 		Interval:               "30s",
@@ -82,7 +98,7 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 	}
 	CheckTCP := &api.AgentServiceCheck{
 		CheckID:                checkID + "_TCP_" + s.id,
-		TCP:                    serviceAddr,
+		TCP:                    tcpAddress,
 		TLSSkipVerify:          true,
 		Interval:               "30s",
 		Status:                 "passing",
