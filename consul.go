@@ -48,13 +48,14 @@ func NewService(consulAddress string, serviceID string, serviceName string, addr
 }
 
 // Registers the service to consul and starts the basic TTL health check.
-func (s *Service) Start(serviceAddr string, servicePort string) {
+func (s *Service) Start(consulAddress string, serviceAddr string, servicePort string) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	s.ServiceIDCheck(&s.id, s.name)
 	s.registerServiceConsul(serviceAddr, servicePort)
 
 	go s.updateHealthCheck()
+	go s.WatchHealthChecks(consulAddress)
 
 	wg.Wait()
 }
