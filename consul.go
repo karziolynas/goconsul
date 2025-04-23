@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
+	"github.com/hashicorp/consul/api/watch"
 )
 
 const (
@@ -47,20 +48,48 @@ func NewService(consulAddress string, serviceID string, serviceName string, addr
 }
 
 // Registers the service to consul and starts the basic TTL health check.
-func (s *Service) Start() {
+func (s *Service) Start(serviceAddr string, servicePort string) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	s.ServiceIDCheck(&s.id, s.name)
-	s.registerServiceConsul()
+	s.registerServiceConsul(serviceAddr, servicePort)
 
 	go s.updateHealthCheck()
 
-	defer wg.Done()
 	wg.Wait()
 }
 
 // Registers the service to consul.
-func (s *Service) registerServiceConsul() {
+func (s *Service) registerServiceConsul(serviceAddr string, servicePort string) {
+
+	CheckTTL := &api.AgentServiceCheck{
+		CheckID:                checkID + "_TTL_" + s.id,
+		TLSSkipVerify:          true,
+		TTL:                    ttl.String(),
+		FailuresBeforeWarning:  1,
+		FailuresBeforeCritical: 1,
+	}
+	CheckHTTP := &api.AgentServiceCheck{
+		CheckID:                checkID + "_HTTP_" + s.id,
+		HTTP:                   serviceAddr,
+		TLSSkipVerify:          true,
+		Method:                 "GET",
+		Interval:               "30s",
+		Status:                 "passing",
+		FailuresBeforeWarning:  1,
+		FailuresBeforeCritical: 1,
+	}
+	connectTo := "localhost:" + servicePort
+	CheckTCP := &api.AgentServiceCheck{
+		CheckID:                checkID + "_TCP_" + s.id,
+		TCP:                    connectTo,
+		TLSSkipVerify:          true,
+		Interval:               "30s",
+		Status:                 "passing",
+		Timeout:                "5s",
+		FailuresBeforeWarning:  1,
+		FailuresBeforeCritical: 1,
+	}
 
 	register := &api.AgentServiceRegistration{
 		ID:      s.id,
@@ -68,11 +97,7 @@ func (s *Service) registerServiceConsul() {
 		Tags:    s.tags,
 		Address: s.address,
 		Port:    s.port,
-		Check: &api.AgentServiceCheck{
-			TLSSkipVerify: true,
-			TTL:           ttl.String(),
-			CheckID:       checkID + "_" + s.id,
-		},
+		Checks:  []*api.AgentServiceCheck{CheckTTL, CheckHTTP, CheckTCP},
 	}
 
 	if err := s.consulClient.Agent().ServiceRegister(register); err != nil {
@@ -95,6 +120,47 @@ func (s *Service) updateHealthCheck() {
 		fmt.Printf("Service TTL updated! \n")
 	}
 
+}
+
+func (s *Service) WatchHealthChecks(consulAddress string) {
+	watchParams := map[string]interface{}{
+		"type":    "service",
+		"service": s.name,
+	}
+
+	plan, err := watch.Parse(watchParams)
+	if err != nil {
+		log.Printf("Failed to create watcher for %s: %v", s.id, err)
+		return
+	}
+
+	plan.Handler = func(idx uint64, data interface{}) {
+		entries := data.([]*api.ServiceEntry)
+		for _, entry := range entries {
+			if entry.Service.ID != s.id {
+				continue
+			}
+
+			for _, check := range entry.Checks {
+				log.Printf("Health check %s for service %s is %s",
+					check.CheckID, s.id, check.Status)
+
+				if check.Status == api.HealthCritical {
+					log.Printf("CRITICAL: Health check %s failed for service %s",
+						check.CheckID, s.id)
+				}
+			}
+		}
+	}
+
+	go func() {
+		err := plan.Run(consulAddress)
+		if err != nil {
+			log.Printf("Watcher for %s failed: %v", s.id, err)
+		}
+	}()
+
+	log.Printf("Started health check watcher for service %s", s.id)
 }
 
 // doesnt make sense - docker already notifies if port is in use
