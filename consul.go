@@ -48,11 +48,11 @@ func NewService(consulAddress string, serviceID string, serviceName string, addr
 }
 
 // Registers the service to consul and starts the basic TTL health check.
-func (s *Service) Start(consulAddress string, serviceAddr string, servicePort string) {
+func (s *Service) Start(consulAddress string, serviceAddr string) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	s.ServiceIDCheck(&s.id, s.name)
-	s.registerServiceConsul(serviceAddr, servicePort)
+	s.registerServiceConsul(serviceAddr)
 
 	go s.updateHealthCheck()
 	go s.WatchHealthChecks(consulAddress)
@@ -61,7 +61,7 @@ func (s *Service) Start(consulAddress string, serviceAddr string, servicePort st
 }
 
 // Registers the service to consul.
-func (s *Service) registerServiceConsul(serviceAddr string, servicePort string) {
+func (s *Service) registerServiceConsul(serviceAddr string) {
 
 	CheckTTL := &api.AgentServiceCheck{
 		CheckID:                checkID + "_TTL_" + s.id,
@@ -80,10 +80,9 @@ func (s *Service) registerServiceConsul(serviceAddr string, servicePort string) 
 		FailuresBeforeWarning:  1,
 		FailuresBeforeCritical: 1,
 	}
-	connectTo := "localhost:" + servicePort
 	CheckTCP := &api.AgentServiceCheck{
 		CheckID:                checkID + "_TCP_" + s.id,
-		TCP:                    connectTo,
+		TCP:                    serviceAddr,
 		TLSSkipVerify:          true,
 		Interval:               "30s",
 		Status:                 "passing",
