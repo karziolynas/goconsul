@@ -49,14 +49,14 @@ func NewService(consulAddress string, serviceID string, serviceName string, addr
 }
 
 // Registers the service to consul and starts the basic TTL health check.
-func (s *Service) Start(consulAddress string, serviceAddr string) {
+func (s *Service) Start(consulAddress, serviceAddr, handlerUrl string) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	s.ServiceIDCheck(&s.id, s.name)
 	s.registerServiceConsul(serviceAddr)
 
 	go s.updateHealthCheck()
-	go s.WatchHealthChecks(consulAddress)
+	go s.WatchHealthChecks(consulAddress, handlerUrl)
 
 	wg.Wait()
 }
@@ -138,35 +138,18 @@ func (s *Service) updateHealthCheck() {
 
 }
 
-func (s *Service) WatchHealthChecks(consulAddress string) {
+func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 	watchParams := map[string]interface{}{
-		"type":    "service",
-		"service": s.name,
+		"type":         "service",
+		"service":      s.name,
+		"handler_type": "http",
+		"http_handler": handlerURL,
 	}
 
 	plan, err := watch.Parse(watchParams)
 	if err != nil {
 		log.Printf("Failed to create watcher for %s: %v", s.id, err)
 		return
-	}
-
-	plan.Handler = func(idx uint64, data interface{}) {
-		entries := data.([]*api.ServiceEntry)
-		for _, entry := range entries {
-			if entry.Service.ID != s.id {
-				continue
-			}
-
-			for _, check := range entry.Checks {
-				log.Printf("Health check %s for service %s is %s",
-					check.CheckID, s.id, check.Status)
-
-				if check.Status == api.HealthCritical {
-					log.Printf("CRITICAL: Health check %s failed for service %s",
-						check.CheckID, s.id)
-				}
-			}
-		}
 	}
 
 	go func() {
