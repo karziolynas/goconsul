@@ -143,7 +143,10 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 		"type":         "service",
 		"service":      s.name,
 		"handler_type": "http",
-		"http_handler": handlerURL,
+		"http_handler_config": map[string]interface{}{
+			"path":   handlerURL,
+			"method": "POST",
+		},
 	}
 
 	plan, err := watch.Parse(watchParams)
