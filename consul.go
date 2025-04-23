@@ -14,7 +14,7 @@ import (
 
 const (
 	ttl     = time.Second * 8
-	checkID = "check_TTL"
+	checkID = "check"
 )
 
 type Service struct {
