@@ -1,8 +1,12 @@
 package goconsul
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
+	"io"
 	"log"
+	"net/http"
 	"net/url"
 	"strconv"
 	"strings"
@@ -139,33 +143,54 @@ func (s *Service) updateHealthCheck() {
 }
 
 func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
-
-	config := watch.HttpHandlerConfig{
-		Path:          handlerURL,
-		Method:        "POST",
-		TLSSkipVerify: true,
-		Header: map[string][]string{
-			"Content-Type": {"application/json"},
-		},
-	}
-
 	watchParams := map[string]interface{}{
-		"type":                "service",
-		"service":             s.name,
-		"handler_type":        "http",
-		"http_handler_config": config,
+		"type":    "service",
+		"service": s.name,
 	}
 
-	//plan, err := watch.Parse(watchParams)
-	var exemptList []string
-	plan, err := watch.ParseExempt(watchParams, exemptList)
+	plan, err := watch.Parse(watchParams)
 	if err != nil {
 		log.Printf("Failed to create watcher for %s: %v", s.id, err)
 		return
 	}
-	if len(exemptList) > 0 {
-		for i := 0; i < len(exemptList); i++ {
-			log.Printf(exemptList[i])
+
+	//HTTP handler for consul watcher doesnt work, while
+	//the function handler does - thats why the http post request is sent by hand
+	plan.Handler = func(idx uint64, data interface{}) {
+		entries := data.([]*api.ServiceEntry)
+		for _, entry := range entries {
+			if entry.Service.ID != s.id {
+				continue
+			}
+
+			for _, check := range entry.Checks {
+				// log.Printf("Health check %s for service %s is %s",
+				// 	check.CheckID, s.id, check.Status)
+
+				if check.Status == api.HealthCritical {
+					log.Printf("CRITICAL: Health check %s failed for service %s", check.CheckID, s.id)
+					//sends the post request to the module
+					postBody, _ := json.Marshal(map[string]string{
+						"ServiceID":     s.id,
+						"CheckName":     check.Name,
+						"CheckStatus":   check.Status,
+						"FailureTime":   time.Now().GoString(),
+						"FailureOutput": check.Output,
+					})
+					responseBody := bytes.NewBuffer(postBody)
+					resp, err := http.Post(handlerURL, "application/json", responseBody)
+					if err != nil {
+						log.Fatalf("An Error Occured %v", err)
+					}
+					defer resp.Body.Close()
+					body, err := io.ReadAll(resp.Body)
+					if err != nil {
+						log.Fatalln(err)
+					}
+					sb := string(body)
+					log.Println(sb)
+				}
+			}
 		}
 	}
 
