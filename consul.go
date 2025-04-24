@@ -66,7 +66,7 @@ func (s *Service) Start(consulAddress, serviceAddr, handlerUrl /*, containerName
 	go s.updateHealthCheck()
 	go s.WatchHealthChecks(consulAddress, handlerUrl)
 
-	startPerformanceChecks() //containerName)
+	go startPerformanceChecks() //containerName)
 	wg.Wait()
 }
 
