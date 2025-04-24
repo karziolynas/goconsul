@@ -139,6 +139,7 @@ func (s *Service) updateHealthCheck() {
 }
 
 func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
+
 	config := watch.HttpHandlerConfig{
 		Path:          handlerURL,
 		Method:        "POST",
@@ -155,10 +156,17 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 		"http_handler_config": config,
 	}
 
-	plan, err := watch.Parse(watchParams)
+	//plan, err := watch.Parse(watchParams)
+	var exemptList []string
+	plan, err := watch.ParseExempt(watchParams, exemptList)
 	if err != nil {
 		log.Printf("Failed to create watcher for %s: %v", s.id, err)
 		return
+	}
+	if len(exemptList) >= 0 {
+		for i := 0; i < len(exemptList); i++ {
+			log.Printf(exemptList[i])
+		}
 	}
 
 	go func() {
