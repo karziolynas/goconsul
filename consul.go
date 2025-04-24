@@ -139,15 +139,20 @@ func (s *Service) updateHealthCheck() {
 }
 
 func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
-	watchParams := map[string]interface{}{
-		"type":         "service",
-		"service":      s.name,
-		"handler_type": "http",
-		"http_handler_config": map[string]interface{}{
-			"path":            handlerURL,
-			"method":          "POST",
-			"tls_skip_verify": true,
+	config := watch.HttpHandlerConfig{
+		Path:          handlerURL,
+		Method:        "POST",
+		TLSSkipVerify: true,
+		Header: map[string][]string{
+			"Content-Type": {"application/json"},
 		},
+	}
+
+	watchParams := map[string]interface{}{
+		"type":                "service",
+		"service":             s.name,
+		"handler_type":        "http",
+		"http_handler_config": config,
 	}
 
 	plan, err := watch.Parse(watchParams)
