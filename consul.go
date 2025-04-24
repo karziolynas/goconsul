@@ -163,7 +163,7 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 		log.Printf("Failed to create watcher for %s: %v", s.id, err)
 		return
 	}
-	if len(exemptList) >= 0 {
+	if len(exemptList) > 0 {
 		for i := 0; i < len(exemptList); i++ {
 			log.Printf(exemptList[i])
 		}
