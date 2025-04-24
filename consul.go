@@ -245,12 +245,24 @@ func startPerformanceChecks() { //containerName string) {
 	// fmt.Printf("CPU usage: %.2f%%\n", cpuPercent)
 	// fmt.Printf("Memory usage: %.2f MB / %.2f MB (%.2f%%)\n", memUsage, memLimit, memPercent)
 
-	usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
-	fmt.Println("Memory usage (bytes):", string(usage))
+	ticker := time.NewTicker(time.Second * 30)
+	for {
+		usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+		memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
+		memMB := float64(memBytes) / (1024 * 1024)
+		fmt.Printf("Memory usage (bytes): %f", memMB)
 
-	cpu, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
-	fmt.Println("CPU usage (nanoseconds):", string(cpu))
-
+		cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
+		usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
+		time.Sleep(1 * time.Second)
+		cpu2, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
+		usage2, _ := strconv.ParseInt(strings.TrimSpace(string(cpu2)), 10, 64)
+		delta := usage2 - usage1
+		// the cores are hardcoded - might be inacurate on different machines
+		cpuPercent := float64(delta) / float64(1e9) * 100.0 * 8 // core count
+		fmt.Printf("CPU usage (nanoseconds): %f", cpuPercent)
+		<-ticker.C
+	}
 }
 
 // doesnt make sense - docker already notifies if port is in use
