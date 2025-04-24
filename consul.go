@@ -2,20 +2,21 @@ package goconsul
 
 import (
 	"bytes"
-	"context"
+	//"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
+	"os"
 	"strconv"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/docker/docker/api/types"
-	"github.com/docker/docker/client"
+	//"github.com/docker/docker/api/types"
+	//"github.com/docker/docker/client"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/api/watch"
 )
@@ -56,7 +57,7 @@ func NewService(consulAddress string, serviceID string, serviceName string, addr
 }
 
 // Registers the service to consul and starts the basic TTL health check.
-func (s *Service) Start(consulAddress, serviceAddr, handlerUrl, containerName string) {
+func (s *Service) Start(consulAddress, serviceAddr, handlerUrl /*, containerName*/ string) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	s.ServiceIDCheck(&s.id, s.name)
@@ -65,7 +66,7 @@ func (s *Service) Start(consulAddress, serviceAddr, handlerUrl, containerName st
 	go s.updateHealthCheck()
 	go s.WatchHealthChecks(consulAddress, handlerUrl)
 
-	startPerformanceChecks(containerName)
+	startPerformanceChecks() //containerName)
 	wg.Wait()
 }
 
@@ -209,40 +210,47 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 	log.Printf("Started health check watcher for service %s", s.id)
 }
 
-func startPerformanceChecks(containerName string) {
-	cli, err := client.NewClientWithOpts(client.FromEnv)
-	if err != nil {
-		panic(err)
-	}
+func startPerformanceChecks() { //containerName string) {
+	// cli, err := client.NewClientWithOpts(client.FromEnv)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	stats, err := cli.ContainerStats(context.Background(), containerName, false)
-	if err != nil {
-		panic(err)
-	}
-	defer stats.Body.Close()
+	// stats, err := cli.ContainerStats(context.Background(), containerName, false)
+	// if err != nil {
+	// 	panic(err)
+	// }
+	// defer stats.Body.Close()
 
-	data, err := io.ReadAll(stats.Body)
-	if err != nil {
-		panic(err)
-	}
+	// data, err := io.ReadAll(stats.Body)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	var statsJSON types.StatsJSON
-	err = json.Unmarshal(data, &statsJSON)
-	if err != nil {
-		panic(err)
-	}
+	// var statsJSON types.StatsJSON
+	// err = json.Unmarshal(data, &statsJSON)
+	// if err != nil {
+	// 	panic(err)
+	// }
 
-	cpuDelta := float64(statsJSON.CPUStats.CPUUsage.TotalUsage) - float64(statsJSON.PreCPUStats.CPUUsage.TotalUsage)
-	systemDelta := float64(statsJSON.CPUStats.SystemUsage) - float64(statsJSON.PreCPUStats.SystemUsage)
-	numberOfCores := float64(statsJSON.CPUStats.OnlineCPUs)
-	cpuPercent := (cpuDelta / systemDelta) * numberOfCores * 100.0
+	// cpuDelta := float64(statsJSON.CPUStats.CPUUsage.TotalUsage) - float64(statsJSON.PreCPUStats.CPUUsage.TotalUsage)
+	// systemDelta := float64(statsJSON.CPUStats.SystemUsage) - float64(statsJSON.PreCPUStats.SystemUsage)
+	// numberOfCores := float64(statsJSON.CPUStats.OnlineCPUs)
+	// cpuPercent := (cpuDelta / systemDelta) * numberOfCores * 100.0
 
-	memUsage := float64(statsJSON.MemoryStats.Usage) / (1024 * 1024) // in MB
-	memLimit := float64(statsJSON.MemoryStats.Limit) / (1024 * 1024) // in MB
-	memPercent := (memUsage / memLimit) * 100.0
+	// memUsage := float64(statsJSON.MemoryStats.Usage) / (1024 * 1024) // in MB
+	// memLimit := float64(statsJSON.MemoryStats.Limit) / (1024 * 1024) // in MB
+	// memPercent := (memUsage / memLimit) * 100.0
 
-	fmt.Printf("CPU usage: %.2f%%\n", cpuPercent)
-	fmt.Printf("Memory usage: %.2f MB / %.2f MB (%.2f%%)\n", memUsage, memLimit, memPercent)
+	// fmt.Printf("CPU usage: %.2f%%\n", cpuPercent)
+	// fmt.Printf("Memory usage: %.2f MB / %.2f MB (%.2f%%)\n", memUsage, memLimit, memPercent)
+
+	usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+	fmt.Println("Memory usage (bytes):", string(usage))
+
+	cpu, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
+	fmt.Println("CPU usage (nanoseconds):", string(cpu))
+
 }
 
 // doesnt make sense - docker already notifies if port is in use
