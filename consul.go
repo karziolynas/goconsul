@@ -211,6 +211,7 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 }
 
 func startPerformanceChecks() {
+	time.Sleep(5 * time.Second)
 	ticker := time.NewTicker(time.Second * 30)
 	for {
 		usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
