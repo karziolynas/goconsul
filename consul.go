@@ -210,48 +210,16 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 	log.Printf("Started health check watcher for service %s", s.id)
 }
 
-func startPerformanceChecks() { //containerName string) {
-	// cli, err := client.NewClientWithOpts(client.FromEnv)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// stats, err := cli.ContainerStats(context.Background(), containerName, false)
-	// if err != nil {
-	// 	panic(err)
-	// }
-	// defer stats.Body.Close()
-
-	// data, err := io.ReadAll(stats.Body)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// var statsJSON types.StatsJSON
-	// err = json.Unmarshal(data, &statsJSON)
-	// if err != nil {
-	// 	panic(err)
-	// }
-
-	// cpuDelta := float64(statsJSON.CPUStats.CPUUsage.TotalUsage) - float64(statsJSON.PreCPUStats.CPUUsage.TotalUsage)
-	// systemDelta := float64(statsJSON.CPUStats.SystemUsage) - float64(statsJSON.PreCPUStats.SystemUsage)
-	// numberOfCores := float64(statsJSON.CPUStats.OnlineCPUs)
-	// cpuPercent := (cpuDelta / systemDelta) * numberOfCores * 100.0
-
-	// memUsage := float64(statsJSON.MemoryStats.Usage) / (1024 * 1024) // in MB
-	// memLimit := float64(statsJSON.MemoryStats.Limit) / (1024 * 1024) // in MB
-	// memPercent := (memUsage / memLimit) * 100.0
-
-	// fmt.Printf("CPU usage: %.2f%%\n", cpuPercent)
-	// fmt.Printf("Memory usage: %.2f MB / %.2f MB (%.2f%%)\n", memUsage, memLimit, memPercent)
-
+func startPerformanceChecks() {
 	ticker := time.NewTicker(time.Second * 30)
 	for {
 		usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
 		memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
-		memMB := float64(memBytes) / (1024 * 1024)
-		fmt.Printf("Memory usage (bytes): %f", memMB)
+		memMB := float64(memBytes) / (1024 * 1024) //converting to MB
+		fmt.Printf("Memory usage (MB): %f \n", memMB)
 
+		//calculating the delta of cpu usage.
+		//might be 0, if the microservice is sitting around dormant
 		cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 		usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
 		time.Sleep(1 * time.Second)
@@ -260,7 +228,7 @@ func startPerformanceChecks() { //containerName string) {
 		delta := usage2 - usage1
 		// the cores are hardcoded - might be inacurate on different machines
 		cpuPercent := float64(delta) / float64(1e9) * 100.0 * 8 // core count
-		fmt.Printf("CPU usage (nanoseconds): %f", cpuPercent)
+		fmt.Printf("CPU usage (%) : %f  \n", cpuPercent)
 		<-ticker.C
 	}
 }
