@@ -228,7 +228,7 @@ func startPerformanceChecks() {
 		delta := usage2 - usage1
 		// the cores are hardcoded - might be inacurate on different machines
 		cpuPercent := float64(delta) / float64(1e9) * 100.0 * 8 // core count
-		fmt.Printf("CPU usage (%) : %f  \n", cpuPercent)
+		fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
 		<-ticker.C
 	}
 }
