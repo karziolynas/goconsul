@@ -93,7 +93,7 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 		Name:      "TTL Health Check",
 		ServiceID: s.id,
 		AgentServiceCheck: api.AgentServiceCheck{
-			CheckID:                checkID + "_TTL_" + s.id,
+			//CheckID:                checkID + "_TTL_" + s.id,
 			TLSSkipVerify:          true,
 			TTL:                    ttl.String(),
 			FailuresBeforeWarning:  1,
@@ -105,7 +105,7 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 		Name:      "HTTP Health Check",
 		ServiceID: s.id,
 		AgentServiceCheck: api.AgentServiceCheck{
-			CheckID:                checkID + "_HTTP_" + s.id,
+			//CheckID:                checkID + "_HTTP_" + s.id,
 			HTTP:                   httpEndpoint,
 			TLSSkipVerify:          true,
 			Method:                 "GET",
@@ -120,7 +120,7 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 		Name:      "TCP Health Check",
 		ServiceID: s.id,
 		AgentServiceCheck: api.AgentServiceCheck{
-			CheckID:                checkID + "_TCP_" + s.id,
+			//CheckID:                checkID + "_TCP_" + s.id,
 			TCP:                    tcpAddress,
 			TLSSkipVerify:          true,
 			Interval:               "30s",
