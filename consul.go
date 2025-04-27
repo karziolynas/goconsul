@@ -89,7 +89,9 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 	}
 
 	CheckTTL := &api.AgentCheckRegistration{
-		ID: checkID + "_TTL_" + s.id,
+		ID:        checkID + "_TTL_" + s.id,
+		Name:      "TTL Health Check",
+		ServiceID: s.id,
 		AgentServiceCheck: api.AgentServiceCheck{
 			CheckID:                checkID + "_TTL_" + s.id,
 			TLSSkipVerify:          true,
@@ -99,7 +101,9 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 		},
 	}
 	CheckHTTP := &api.AgentCheckRegistration{
-		ID: checkID + "_HTTP_" + s.id,
+		ID:        checkID + "_HTTP_" + s.id,
+		Name:      "HTTP Health Check",
+		ServiceID: s.id,
 		AgentServiceCheck: api.AgentServiceCheck{
 			CheckID:                checkID + "_HTTP_" + s.id,
 			HTTP:                   httpEndpoint,
@@ -112,7 +116,9 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 		},
 	}
 	CheckTCP := &api.AgentCheckRegistration{
-		ID: checkID + "_TCP_" + s.id,
+		ID:        checkID + "_TCP_" + s.id,
+		Name:      "TCP Health Check",
+		ServiceID: s.id,
 		AgentServiceCheck: api.AgentServiceCheck{
 			CheckID:                checkID + "_TCP_" + s.id,
 			TCP:                    tcpAddress,
