@@ -88,32 +88,38 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 		tcpAddress = fmt.Sprintf("%s:%d", s.address, s.port)
 	}
 
-	CheckTTL := &api.AgentServiceCheck{
-		CheckID:                checkID + "_TTL_" + s.id,
-		TLSSkipVerify:          true,
-		TTL:                    ttl.String(),
-		FailuresBeforeWarning:  1,
-		FailuresBeforeCritical: 1,
+	CheckTTL := &api.AgentCheckRegistration{
+		AgentServiceCheck: api.AgentServiceCheck{
+			CheckID:                checkID + "_TTL_" + s.id,
+			TLSSkipVerify:          true,
+			TTL:                    ttl.String(),
+			FailuresBeforeWarning:  1,
+			FailuresBeforeCritical: 1,
+		},
 	}
-	CheckHTTP := &api.AgentServiceCheck{
-		CheckID:                checkID + "_HTTP_" + s.id,
-		HTTP:                   httpEndpoint,
-		TLSSkipVerify:          true,
-		Method:                 "GET",
-		Interval:               "30s",
-		Status:                 "passing",
-		FailuresBeforeWarning:  1,
-		FailuresBeforeCritical: 1,
+	CheckHTTP := &api.AgentCheckRegistration{
+		AgentServiceCheck: api.AgentServiceCheck{
+			CheckID:                checkID + "_HTTP_" + s.id,
+			HTTP:                   httpEndpoint,
+			TLSSkipVerify:          true,
+			Method:                 "GET",
+			Interval:               "30s",
+			Status:                 "passing",
+			FailuresBeforeWarning:  1,
+			FailuresBeforeCritical: 1,
+		},
 	}
-	CheckTCP := &api.AgentServiceCheck{
-		CheckID:                checkID + "_TCP_" + s.id,
-		TCP:                    tcpAddress,
-		TLSSkipVerify:          true,
-		Interval:               "30s",
-		Status:                 "passing",
-		Timeout:                "5s",
-		FailuresBeforeWarning:  1,
-		FailuresBeforeCritical: 1,
+	CheckTCP := &api.AgentCheckRegistration{
+		AgentServiceCheck: api.AgentServiceCheck{
+			CheckID:                checkID + "_TCP_" + s.id,
+			TCP:                    tcpAddress,
+			TLSSkipVerify:          true,
+			Interval:               "30s",
+			Status:                 "passing",
+			Timeout:                "5s",
+			FailuresBeforeWarning:  1,
+			FailuresBeforeCritical: 1,
+		},
 	}
 
 	register := &api.AgentServiceRegistration{
@@ -122,12 +128,15 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 		Tags:    s.tags,
 		Address: s.address,
 		Port:    s.port,
-		Checks:  []*api.AgentServiceCheck{CheckTTL, CheckHTTP, CheckTCP},
 	}
 
 	if err := s.consulClient.Agent().ServiceRegister(register); err != nil {
 		log.Fatal(err)
 	}
+
+	s.consulClient.Agent().CheckRegister(CheckTTL)
+	s.consulClient.Agent().CheckRegister(CheckHTTP)
+	s.consulClient.Agent().CheckRegister(CheckTCP)
 
 	fmt.Printf("Service - '%v' registered! \n", s.id)
 }
