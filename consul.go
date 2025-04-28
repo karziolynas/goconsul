@@ -157,7 +157,7 @@ func (s *Service) updateHealthCheck() {
 	for {
 		err := s.consulClient.Agent().UpdateTTL(checkId, "Service TTL updated", api.HealthPassing)
 		if err != nil {
-			log.Fatal(err)
+			log.Println(err)
 		}
 		<-ticker.C
 		fmt.Printf("Service TTL updated! \n")
