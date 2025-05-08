@@ -2,7 +2,8 @@ package goconsul
 
 import (
 	"bytes"
-	//"context"
+	"crypto/tls"
+	"crypto/x509"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -15,8 +16,6 @@ import (
 	"sync"
 	"time"
 
-	//"github.com/docker/docker/api/types"
-	//"github.com/docker/docker/client"
 	"github.com/hashicorp/consul/api"
 	"github.com/hashicorp/consul/api/watch"
 )
@@ -28,6 +27,7 @@ const (
 
 type Service struct {
 	consulClient *api.Client
+	config       *api.Config
 	id           string
 	name         string
 	address      string
@@ -38,16 +38,49 @@ type Service struct {
 // Registers a new consul client based on provided arguments.
 // Returns a Service struct with a pointer to the consul client.
 func NewService(consulAddress string, serviceID string, serviceName string, address string, port int, tags []string) *Service {
-	consulClient, err := api.NewClient(
-		&api.Config{
-			Address: consulAddress,
-		})
+	caCert, err := os.ReadFile("./certs/consul-agent-ca.pem")
 	if err != nil {
-		log.Fatal(err)
+		log.Fatalf("Failed to read CA file: %v", err)
+	}
+	caPool := x509.NewCertPool()
+	okBool := caPool.AppendCertsFromPEM(caCert)
+	if !okBool {
+		log.Println("Error appending certs")
+	}
+
+	//Loads CLIENT cert and key
+	cert, err := tls.LoadX509KeyPair(
+		"./certs/dc1-client-consul-0.pem",
+		"./certs/dc1-client-consul-0-key.pem",
+	)
+	if err != nil {
+		log.Fatalf("Failed to load client cert/key: %v", err)
+	}
+
+	tlsConfig := &tls.Config{
+		RootCAs:      caPool,
+		Certificates: []tls.Certificate{cert},
+		MinVersion:   tls.VersionTLS12,
+	}
+
+	config := api.DefaultConfig()
+	config.Address = consulAddress
+	config.Scheme = "https"
+	config.HttpClient = &http.Client{
+		Transport: &http.Transport{
+			TLSClientConfig: tlsConfig,
+		},
+	}
+
+	consulClient, err := api.NewClient(config)
+	if err != nil {
+		log.Println("Failed creating client")
+		return nil
 	}
 
 	return &Service{
 		consulClient: consulClient,
+		config:       config,
 		id:           serviceID,
 		name:         serviceName,
 		address:      address,
@@ -187,12 +220,8 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 			}
 
 			for _, check := range entry.Checks {
-				// log.Printf("Health check %s for service %s is %s",
-				// 	check.CheckID, s.id, check.Status)
-
 				if check.Status == api.HealthCritical {
 					log.Printf("CRITICAL: Health check %s failed for service %s", check.CheckID, s.id)
-					//sends the post request to the module
 					postBody, _ := json.Marshal(map[string]string{
 						"ServiceID":     s.id,
 						"CheckName":     check.CheckID,
@@ -219,7 +248,7 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 	}
 
 	go func() {
-		err := plan.Run(consulAddress)
+		err := plan.RunWithConfig(consulAddress, s.config)
 		if err != nil {
 			log.Printf("Watcher for %s failed: %v", s.id, err)
 		}
@@ -229,7 +258,7 @@ func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
 }
 
 func startPerformanceChecks() {
-	time.Sleep(5 * time.Second)
+	time.Sleep(10 * time.Second)
 	ticker := time.NewTicker(time.Second * 30)
 	for {
 		usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
@@ -237,15 +266,13 @@ func startPerformanceChecks() {
 		memMB := float64(memBytes) / (1024 * 1024) //converting to MB
 		fmt.Printf("Memory usage (MB): %f \n", memMB)
 
-		//calculating the delta of cpu usage.
-		//might be 0, if the microservice is sitting around dormant
 		cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 		usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
-		time.Sleep(1 * time.Second)
+		time.Sleep(5 * time.Second)
 		cpu2, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 		usage2, _ := strconv.ParseInt(strings.TrimSpace(string(cpu2)), 10, 64)
 		delta := usage2 - usage1
-		// the cores are hardcoded - might be inacurate on different machines
+
 		cpuPercent := float64(delta) / float64(1e9) * 100.0 * 8 // core count
 		fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
 		<-ticker.C
