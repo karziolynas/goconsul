@@ -38,7 +38,7 @@ type Service struct {
 // Registers a new consul client based on provided arguments.
 // Returns a Service struct with a pointer to the consul client.
 func NewService(consulAddress string, serviceID string, serviceName string, address string, port int, tags []string) *Service {
-	caCert, err := os.ReadFile("./certs/consul-agent-ca.pem")
+	caCert, err := os.ReadFile("/certs/consul-agent-ca.pem")
 	if err != nil {
 		log.Fatalf("Failed to read CA file: %v", err)
 	}
@@ -50,8 +50,8 @@ func NewService(consulAddress string, serviceID string, serviceName string, addr
 
 	//Loads CLIENT cert and key
 	cert, err := tls.LoadX509KeyPair(
-		"./certs/dc1-client-consul-0.pem",
-		"./certs/dc1-client-consul-0-key.pem",
+		"/certs/dc1-client-consul-0.pem",
+		"/certs/dc1-client-consul-0-key.pem",
 	)
 	if err != nil {
 		log.Fatalf("Failed to load client cert/key: %v", err)
