@@ -1,12 +1,9 @@
 package goconsul
 
 import (
-	"bytes"
 	"crypto/tls"
 	"crypto/x509"
-	"encoding/json"
 	"fmt"
-	"io"
 	"log"
 	"net/http"
 	"net/url"
@@ -17,7 +14,6 @@ import (
 	"time"
 
 	"github.com/hashicorp/consul/api"
-	"github.com/hashicorp/consul/api/watch"
 )
 
 const (
@@ -97,7 +93,6 @@ func (s *Service) Start(consulAddress, serviceAddr, handlerUrl /*, containerName
 	s.registerServiceConsul(serviceAddr)
 
 	go s.updateHealthCheck()
-	go s.WatchHealthChecks(consulAddress, handlerUrl)
 
 	go startPerformanceChecks() //containerName)
 	wg.Wait()
@@ -130,7 +125,7 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 			TLSSkipVerify:          true,
 			TTL:                    ttl.String(),
 			FailuresBeforeWarning:  1,
-			FailuresBeforeCritical: 1,
+			FailuresBeforeCritical: 3,
 		},
 	}
 	CheckHTTP := &api.AgentCheckRegistration{
@@ -145,7 +140,7 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 			Interval:               "30s",
 			Status:                 "passing",
 			FailuresBeforeWarning:  1,
-			FailuresBeforeCritical: 1,
+			FailuresBeforeCritical: 3,
 		},
 	}
 	CheckTCP := &api.AgentCheckRegistration{
@@ -160,7 +155,7 @@ func (s *Service) registerServiceConsul(serviceAddr string) {
 			Status:                 "passing",
 			Timeout:                "5s",
 			FailuresBeforeWarning:  1,
-			FailuresBeforeCritical: 1,
+			FailuresBeforeCritical: 3,
 		},
 	}
 
@@ -196,65 +191,6 @@ func (s *Service) updateHealthCheck() {
 		fmt.Printf("Service TTL updated! \n")
 	}
 
-}
-
-func (s *Service) WatchHealthChecks(consulAddress, handlerURL string) {
-	watchParams := map[string]interface{}{
-		"type":    "service",
-		"service": s.name,
-	}
-
-	plan, err := watch.Parse(watchParams)
-	if err != nil {
-		log.Printf("Failed to create watcher for %s: %v", s.id, err)
-		return
-	}
-
-	//HTTP handler for consul watcher doesnt work, while
-	//the function handler does - thats why the http post request is sent by hand
-	plan.Handler = func(idx uint64, data interface{}) {
-		entries := data.([]*api.ServiceEntry)
-		for _, entry := range entries {
-			if entry.Service.ID != s.id {
-				continue
-			}
-
-			for _, check := range entry.Checks {
-				if check.Status == api.HealthCritical {
-					log.Printf("CRITICAL: Health check %s failed for service %s", check.CheckID, s.id)
-					postBody, _ := json.Marshal(map[string]string{
-						"ServiceID":     s.id,
-						"CheckName":     check.CheckID,
-						"CheckType":     check.Type,
-						"CheckStatus":   check.Status,
-						"FailureTime":   time.Now().Format("2006-01-02 15:04:05"),
-						"FailureOutput": check.Output,
-					})
-					responseBody := bytes.NewBuffer(postBody)
-					resp, err := http.Post(handlerURL, "application/json", responseBody)
-					if err != nil {
-						log.Fatalf("An Error Occured %v", err)
-					}
-					defer resp.Body.Close()
-					body, err := io.ReadAll(resp.Body)
-					if err != nil {
-						log.Fatalln(err)
-					}
-					sb := string(body)
-					log.Println(sb)
-				}
-			}
-		}
-	}
-
-	go func() {
-		err := plan.RunWithConfig(consulAddress, s.config)
-		if err != nil {
-			log.Printf("Watcher for %s failed: %v", s.id, err)
-		}
-	}()
-
-	log.Printf("Started health check watcher for service %s", s.id)
 }
 
 func startPerformanceChecks() {
