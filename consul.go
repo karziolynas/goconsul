@@ -199,128 +199,62 @@ func (s *Service) startPerformanceChecks() {
 	kv := s.consulClient.KV()
 	time.Sleep(10 * time.Second)
 	ticker := time.NewTicker(time.Minute * 3)
-	isV2 := isCgroupV2()
-	if isV2 {
-		for {
-			log.Println("using v1 calculation method")
-			usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
-			memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
-			memMB := float64(memBytes) / (1024 * 1024) //converting to MB
-			fmt.Printf("Memory usage (MB): %f \n", memMB)
+	for {
+		usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+		memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
+		memMB := float64(memBytes) / (1024 * 1024) //converting to MB
+		fmt.Printf("Memory usage (MB): %f \n", memMB)
 
-			cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
-			usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
-			t1 := time.Now()
-			log.Println("Cpu1: ", usage1)
-			time.Sleep(5 * time.Second)
-
-			cpu2, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
-			usage2, _ := strconv.ParseInt(strings.TrimSpace(string(cpu2)), 10, 64)
-			t2 := time.Now()
-			log.Println("Cpu2: ", usage2)
-
-			delta := usage2 - usage1
-			log.Println("delta cpu: ", delta)
-			deltaTime := t2.Sub(t1).Seconds()
-			log.Println("delta time cpu: ", delta)
-			cpuNumber := float64(runtime.NumCPU())
-			log.Println("core count cpu: ", delta)
-
-			cpuPercent := (float64(delta) / float64(1e9)) / deltaTime * 100 / cpuNumber
-			fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
-
-			data := map[string]float64{
-				"cpu": cpuPercent,
-				"mem": memMB,
-			}
-			//turns data into json
-			jsonData, err := json.Marshal(data)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			p := &api.KVPair{
-				Key:   s.id,
-				Value: jsonData,
-			}
-			//saves it as a key-value pair
-			_, err = kv.Put(p, nil)
-			if err != nil {
-				log.Println(err)
-			}
-
-			<-ticker.C
+		cpu1, errCpu := readCpu()
+		if errCpu != nil {
+			log.Println("err cpu", errCpu)
 		}
-	} else if !isV2 {
-		for {
-			log.Println("using v2 calculation method")
-			usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
-			memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
-			memMB := float64(memBytes) / (1024 * 1024) //converting to MB
-			fmt.Printf("Memory usage (MB): %f \n", memMB)
+		log.Println("Cpu1: ", cpu1)
+		t1 := time.Now()
 
-			cpu1, errCpu := readCPUUsageCgroupV2()
-			if errCpu != nil {
-				log.Println("err cpu", errCpu)
-			}
-			log.Println("Cpu1: ", cpu1)
-			t1 := time.Now()
+		time.Sleep(5 * time.Second)
 
-			time.Sleep(5 * time.Second)
+		cpu2, _ := readCpu()
+		log.Println("Cpu2: ", cpu2)
+		t2 := time.Now()
 
-			cpu2, _ := readCPUUsageCgroupV2()
-			log.Println("Cpu2: ", cpu2)
-			t2 := time.Now()
+		delta := float64(cpu2-cpu1) / 1_000_000.0
+		log.Println("delta cpu: ", delta)
+		deltaTime := t2.Sub(t1).Seconds()
+		log.Println("delta time cpu: ", delta)
+		cpuNumber := float64(runtime.NumCPU())
+		log.Println("corecount: ", delta)
 
-			delta := float64(cpu2-cpu1) / 1_000_000.0
-			log.Println("delta cpu: ", delta)
-			deltaTime := t2.Sub(t1).Seconds()
-			log.Println("delta time cpu: ", delta)
-			cpuNumber := float64(runtime.NumCPU())
-			log.Println("corecount: ", delta)
+		cpuPercent := (delta / (deltaTime * cpuNumber)) * 100.0
+		fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
 
-			cpuPercent := (delta / (deltaTime * cpuNumber)) * 100.0
-			fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
-
-			data := map[string]float64{
-				"cpu": cpuPercent,
-				"mem": memMB,
-			}
-			//turns data into json
-			jsonData, err := json.Marshal(data)
-			if err != nil {
-				log.Fatal(err)
-			}
-
-			p := &api.KVPair{
-				Key:   s.id,
-				Value: jsonData,
-			}
-			//saves it as a key-value pair
-			_, err = kv.Put(p, nil)
-			if err != nil {
-				log.Println(err)
-			}
-
-			<-ticker.C
+		data := map[string]float64{
+			"cpu": cpuPercent,
+			"mem": memMB,
 		}
+		//turns data into json
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		p := &api.KVPair{
+			Key:   s.id,
+			Value: jsonData,
+		}
+		//saves it as a key-value pair
+		_, err = kv.Put(p, nil)
+		if err != nil {
+			log.Println(err)
+		}
+
+		<-ticker.C
 	}
 
 }
 
-// checks for cpu groups
-func isCgroupV2() bool {
-	_, errCpu := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
-	if errCpu != nil {
-		return false
-	} else {
-		return true
-	}
-}
-
-// reads cgroup v2 cpu
-func readCPUUsageCgroupV2() (uint64, error) {
-	data, err := os.ReadFile("/sys/fs/cgroup/cpu.stat")
+func readCpu() (uint64, error) {
+	data, err := os.ReadFile("/sys/fs/cgroup/cpu/cpu.stat")
 	if err != nil {
 		return 0, err
 	}
