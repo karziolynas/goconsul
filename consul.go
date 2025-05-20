@@ -202,6 +202,7 @@ func (s *Service) startPerformanceChecks() {
 	isV2 := isCgroupV2()
 	if !isV2 {
 		for {
+			log.Println("using v1 calculation method")
 			usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
 			memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
 			memMB := float64(memBytes) / (1024 * 1024) //converting to MB
@@ -210,15 +211,20 @@ func (s *Service) startPerformanceChecks() {
 			cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 			usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
 			t1 := time.Now()
+			log.Println("Cpu1: ", cpu1)
 			time.Sleep(5 * time.Second)
 
 			cpu2, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 			usage2, _ := strconv.ParseInt(strings.TrimSpace(string(cpu2)), 10, 64)
 			t2 := time.Now()
+			log.Println("Cpu2: ", cpu2)
 
 			delta := usage2 - usage1
+			log.Println("delta cpu: ", delta)
 			deltaTime := t2.Sub(t1).Seconds()
+			log.Println("delta time cpu: ", delta)
 			cpuNumber := float64(runtime.NumCPU())
+			log.Println("core count cpu: ", delta)
 
 			cpuPercent := (float64(delta) / float64(1e9)) / deltaTime * 100 / cpuNumber
 			fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
@@ -247,22 +253,28 @@ func (s *Service) startPerformanceChecks() {
 		}
 	} else {
 		for {
+			log.Println("using v2 calculation method")
 			usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
 			memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
 			memMB := float64(memBytes) / (1024 * 1024) //converting to MB
 			fmt.Printf("Memory usage (MB): %f \n", memMB)
 
 			cpu1, _ := readCPUUsageCgroupV2()
+			log.Println("Cpu1: ", cpu1)
 			t1 := time.Now()
 
 			time.Sleep(5 * time.Second)
 
 			cpu2, _ := readCPUUsageCgroupV2()
+			log.Println("Cpu2: ", cpu2)
 			t2 := time.Now()
 
 			delta := float64(cpu2-cpu1) / 1_000_000.0
+			log.Println("delta cpu: ", delta)
 			deltaTime := t2.Sub(t1).Seconds()
+			log.Println("delta time cpu: ", delta)
 			cpuNumber := float64(runtime.NumCPU())
+			log.Println("corecount: ", delta)
 
 			cpuPercent := (delta / (deltaTime * cpuNumber)) * 100.0
 			fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
