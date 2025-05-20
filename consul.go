@@ -211,13 +211,13 @@ func (s *Service) startPerformanceChecks() {
 			cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 			usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
 			t1 := time.Now()
-			log.Println("Cpu1: ", cpu1)
+			log.Println("Cpu1: ", usage1)
 			time.Sleep(5 * time.Second)
 
 			cpu2, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 			usage2, _ := strconv.ParseInt(strings.TrimSpace(string(cpu2)), 10, 64)
 			t2 := time.Now()
-			log.Println("Cpu2: ", cpu2)
+			log.Println("Cpu2: ", usage2)
 
 			delta := usage2 - usage1
 			log.Println("delta cpu: ", delta)
