@@ -208,10 +208,7 @@ func (s *Service) startPerformanceChecks() {
 			memMB := float64(memBytes) / (1024 * 1024) //converting to MB
 			fmt.Printf("Memory usage (MB): %f \n", memMB)
 
-			cpu1, errCpu := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
-			if errCpu != nil {
-				log.Println("cpu read error: ", errCpu)
-			}
+			cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 			usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
 			t1 := time.Now()
 			log.Println("Cpu1: ", usage1)
@@ -310,8 +307,12 @@ func (s *Service) startPerformanceChecks() {
 
 // checks for cpu groups
 func isCgroupV2() bool {
-	_, err := os.Stat("/sys/fs/cgroup/cgroup.controllers")
-	return err == nil
+	_, errCpu := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
+	if errCpu != nil {
+		return false
+	} else {
+		return true
+	}
 }
 
 // reads cgroup v2 cpu
