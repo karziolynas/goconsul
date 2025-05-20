@@ -16,7 +16,6 @@ import (
 
 	"github.com/hashicorp/consul/api"
 	"github.com/shirou/gopsutil/v4/cpu"
-	"github.com/shirou/gopsutil/v4/mem"
 )
 
 const (
@@ -201,40 +200,13 @@ func (s *Service) startPerformanceChecks() {
 	time.Sleep(10 * time.Second)
 	ticker := time.NewTicker(time.Minute * 3)
 	for {
-		// usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
-		// memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
-		// memMB := float64(memBytes) / (1024 * 1024) //converting to MB
-		// log.Println("Memory usage (MB): ", memMB)
-
-		// t1 := time.Now()
-		// cpu1, errCpu := readCpu()
-		// if errCpu != nil {
-		// 	log.Println("err cpu", errCpu)
-		// }
-		// log.Println("Cpu1: ", cpu1)
-
-		// time.Sleep(5 * time.Second)
-
-		// t2 := time.Now()
-		// cpu2, _ := readCpu()
-		// log.Println("Cpu2: ", cpu2)
-
-		// delta := float64(cpu2-cpu1) / 1_000_000.0
-		// log.Println("delta cpu: ", delta)
-		// deltaTime := t2.Sub(t1).Seconds()
-		// log.Println("delta time cpu: ", deltaTime)
-		// cpuNumber := float64(runtime.NumCPU())
-		// log.Println("corecount: ", cpuNumber)
-
-		// cpuPercent := (delta / (deltaTime * cpuNumber)) * 100.0
-		// log.Println("CPU usage (percentage) : ", cpuPercent)
-
-		v, _ := mem.VirtualMemory()
-		memMB := float64(v.Used) / (1024 * 1024)
+		usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+		memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
+		memMB := float64(memBytes) / (1024 * 1024) //converting to MB
 		log.Println("Memory usage (MB): ", memMB)
 
 		cpuPercent, _ := cpu.Percent(time.Second*10, false)
-		log.Println("CPU usage (percentage) : ", cpuPercent, "      ", cpuPercent[0])
+		log.Println("CPU usage (percentage) : ", cpuPercent[0])
 
 		data := map[string]float64{
 			"cpu": cpuPercent[0],
