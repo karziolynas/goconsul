@@ -209,8 +209,9 @@ func (s *Service) startPerformanceChecks() {
 		log.Println("CPU usage (percentage) : ", cpuPercent[0])
 
 		data := map[string]float64{
-			"cpu": cpuPercent[0],
-			"mem": memMB,
+			"cpu":    cpuPercent[0],
+			"mem":    memMB,
+			"weight": 8,
 		}
 		//turns data into json
 		jsonData, err := json.Marshal(data)
