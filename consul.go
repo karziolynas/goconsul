@@ -231,8 +231,10 @@ func (s *Service) startPerformanceChecks() {
 
 		v, _ := mem.VirtualMemory()
 		memMB := float64(v.Used) / (1024 * 1024)
+		log.Println("Memory usage (MB): ", memMB)
 
 		cpuPercent, _ := cpu.Percent(time.Second*10, false)
+		log.Println("CPU usage (percentage) : ", cpuPercent, "      ", cpuPercent[0])
 
 		data := map[string]float64{
 			"cpu": cpuPercent[0],
