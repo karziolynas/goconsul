@@ -203,7 +203,7 @@ func (s *Service) startPerformanceChecks() {
 		usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
 		memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
 		memMB := float64(memBytes) / (1024 * 1024) //converting to MB
-		fmt.Printf("Memory usage (MB): %f \n", memMB)
+		log.Println("Memory usage (MB): ", memMB)
 
 		t1 := time.Now()
 		cpu1, errCpu := readCpu()
@@ -221,12 +221,12 @@ func (s *Service) startPerformanceChecks() {
 		delta := float64(cpu2-cpu1) / 1_000_000.0
 		log.Println("delta cpu: ", delta)
 		deltaTime := t2.Sub(t1).Seconds()
-		log.Println("delta time cpu: ", delta)
+		log.Println("delta time cpu: ", deltaTime)
 		cpuNumber := float64(runtime.NumCPU())
-		log.Println("corecount: ", delta)
+		log.Println("corecount: ", cpuNumber)
 
 		cpuPercent := (delta / (deltaTime * cpuNumber)) * 100.0
-		fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
+		log.Println("CPU usage (percentage) : ", cpuPercent)
 
 		data := map[string]float64{
 			"cpu": cpuPercent,
@@ -262,7 +262,6 @@ func readCpu() (uint64, error) {
 	return strconv.ParseUint(valStr, 10, 64)
 }
 
-// doesnt make sense - docker already notifies if port is in use
 func (s *Service) ServiceAddressCheck(port *int) {
 	services, err := s.consulClient.Agent().Services()
 	if err != nil {
