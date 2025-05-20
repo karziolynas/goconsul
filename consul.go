@@ -259,7 +259,10 @@ func (s *Service) startPerformanceChecks() {
 			memMB := float64(memBytes) / (1024 * 1024) //converting to MB
 			fmt.Printf("Memory usage (MB): %f \n", memMB)
 
-			cpu1, _ := readCPUUsageCgroupV2()
+			cpu1, errCpu := readCPUUsageCgroupV2()
+			if errCpu != nil {
+				log.Println("err cpu", errCpu)
+			}
 			log.Println("Cpu1: ", cpu1)
 			t1 := time.Now()
 
