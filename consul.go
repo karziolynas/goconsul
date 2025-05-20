@@ -3,11 +3,13 @@ package goconsul
 import (
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
+	"runtime"
 	"strconv"
 	"strings"
 	"sync"
@@ -86,7 +88,7 @@ func NewService(consulAddress string, serviceID string, serviceName string, addr
 }
 
 // Registers the service to consul and starts the basic TTL health check.
-func (s *Service) Start(consulAddress, serviceAddr, handlerUrl /*, containerName*/ string) {
+func (s *Service) Start(consulAddress, serviceAddr /*, containerName*/ string) {
 	var wg sync.WaitGroup
 	wg.Add(1)
 	s.ServiceIDCheck(&s.id, s.name)
@@ -94,7 +96,7 @@ func (s *Service) Start(consulAddress, serviceAddr, handlerUrl /*, containerName
 
 	go s.updateHealthCheck()
 
-	go startPerformanceChecks() //containerName)
+	go s.startPerformanceChecks()
 	wg.Wait()
 }
 
@@ -193,7 +195,8 @@ func (s *Service) updateHealthCheck() {
 
 }
 
-func startPerformanceChecks() {
+func (s *Service) startPerformanceChecks() {
+	kv := s.consulClient.KV()
 	time.Sleep(10 * time.Second)
 	ticker := time.NewTicker(time.Second * 30)
 	for {
@@ -204,13 +207,40 @@ func startPerformanceChecks() {
 
 		cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 		usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
+		t1 := time.Now()
 		time.Sleep(5 * time.Second)
+
 		cpu2, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
 		usage2, _ := strconv.ParseInt(strings.TrimSpace(string(cpu2)), 10, 64)
-		delta := usage2 - usage1
+		t2 := time.Now()
 
-		cpuPercent := float64(delta) / float64(1e9) * 100.0 * 8 // core count
+		delta := usage2 - usage1
+		deltaTime := t2.Sub(t1).Seconds()
+		cpuNumber := float64(runtime.NumCPU())
+
+		cpuPercent := (float64(delta) / float64(1e9)) / deltaTime * 100 / cpuNumber
 		fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
+
+		data := map[string]float64{
+			"cpu": cpuPercent,
+			"mem": memMB,
+		}
+		//turns data into json
+		jsonData, err := json.Marshal(data)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		p := &api.KVPair{
+			Key:   s.id,
+			Value: jsonData,
+		}
+		//saves it as a key-value pair
+		_, err = kv.Put(p, nil)
+		if err != nil {
+			log.Println(err)
+		}
+
 		<-ticker.C
 	}
 }
@@ -233,20 +263,18 @@ func (s *Service) ServiceAddressCheck(port *int) {
 // testing if automating a pick for service ID is worth it
 // method would check if service id exists and change it to something else
 func (s *Service) ServiceIDCheck(id *string, name string) {
-	filterString := fmt.Sprintf("Service == %s", name)
-	services, err := s.consulClient.Agent().ServicesWithFilter(filterString)
+	services, _, err := s.consulClient.Health().Service(name, "", true, nil)
 	if err != nil {
 		log.Fatal(err)
 	}
 	baseValue := 1
 	for _, entry := range services {
-		if *id == entry.ID {
+		if *id == entry.Service.ID {
 			*id = strings.Replace(*id, strconv.Itoa(baseValue), strconv.Itoa(baseValue+1), 1)
-			fmt.Printf("ID - %s already in use, changed to - %s \n", entry.ID, *id)
+			fmt.Printf("ID - %s already in use, changed to - %s \n", entry.Service.ID, *id)
 		}
 		baseValue++
 	}
-
 }
 
 func (s *Service) ServiceDiscovery() {
