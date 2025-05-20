@@ -199,50 +199,123 @@ func (s *Service) startPerformanceChecks() {
 	kv := s.consulClient.KV()
 	time.Sleep(10 * time.Second)
 	ticker := time.NewTicker(time.Second * 30)
-	for {
-		usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
-		memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
-		memMB := float64(memBytes) / (1024 * 1024) //converting to MB
-		fmt.Printf("Memory usage (MB): %f \n", memMB)
+	isV2 := isCgroupV2()
+	if !isV2 {
+		for {
+			usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+			memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
+			memMB := float64(memBytes) / (1024 * 1024) //converting to MB
+			fmt.Printf("Memory usage (MB): %f \n", memMB)
 
-		cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
-		usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
-		t1 := time.Now()
-		time.Sleep(5 * time.Second)
+			cpu1, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
+			usage1, _ := strconv.ParseInt(strings.TrimSpace(string(cpu1)), 10, 64)
+			t1 := time.Now()
+			time.Sleep(5 * time.Second)
 
-		cpu2, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
-		usage2, _ := strconv.ParseInt(strings.TrimSpace(string(cpu2)), 10, 64)
-		t2 := time.Now()
+			cpu2, _ := os.ReadFile("/sys/fs/cgroup/cpu/cpuacct.usage")
+			usage2, _ := strconv.ParseInt(strings.TrimSpace(string(cpu2)), 10, 64)
+			t2 := time.Now()
 
-		delta := usage2 - usage1
-		deltaTime := t2.Sub(t1).Seconds()
-		cpuNumber := float64(runtime.NumCPU())
+			delta := usage2 - usage1
+			deltaTime := t2.Sub(t1).Seconds()
+			cpuNumber := float64(runtime.NumCPU())
 
-		cpuPercent := (float64(delta) / float64(1e9)) / deltaTime * 100 / cpuNumber
-		fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
+			cpuPercent := (float64(delta) / float64(1e9)) / deltaTime * 100 / cpuNumber
+			fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
 
-		data := map[string]float64{
-			"cpu": cpuPercent,
-			"mem": memMB,
+			data := map[string]float64{
+				"cpu": cpuPercent,
+				"mem": memMB,
+			}
+			//turns data into json
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			p := &api.KVPair{
+				Key:   s.id,
+				Value: jsonData,
+			}
+			//saves it as a key-value pair
+			_, err = kv.Put(p, nil)
+			if err != nil {
+				log.Println(err)
+			}
+
+			<-ticker.C
 		}
-		//turns data into json
-		jsonData, err := json.Marshal(data)
-		if err != nil {
-			log.Fatal(err)
-		}
+	} else {
+		for {
+			usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
+			memBytes, _ := strconv.ParseInt(strings.TrimSpace(string(usage)), 10, 64)
+			memMB := float64(memBytes) / (1024 * 1024) //converting to MB
+			fmt.Printf("Memory usage (MB): %f \n", memMB)
 
-		p := &api.KVPair{
-			Key:   s.id,
-			Value: jsonData,
-		}
-		//saves it as a key-value pair
-		_, err = kv.Put(p, nil)
-		if err != nil {
-			log.Println(err)
-		}
+			cpu1, _ := readCPUUsageCgroupV2()
+			t1 := time.Now()
 
-		<-ticker.C
+			time.Sleep(5 * time.Second)
+
+			cpu2, _ := readCPUUsageCgroupV2()
+			t2 := time.Now()
+
+			delta := float64(cpu2-cpu1) / 1_000_000.0
+			deltaTime := t2.Sub(t1).Seconds()
+			cpuNumber := float64(runtime.NumCPU())
+
+			cpuPercent := (delta / (deltaTime * cpuNumber)) * 100.0
+			fmt.Printf("CPU usage (percentage) : %f  \n", cpuPercent)
+
+			data := map[string]float64{
+				"cpu": cpuPercent,
+				"mem": memMB,
+			}
+			//turns data into json
+			jsonData, err := json.Marshal(data)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			p := &api.KVPair{
+				Key:   s.id,
+				Value: jsonData,
+			}
+			//saves it as a key-value pair
+			_, err = kv.Put(p, nil)
+			if err != nil {
+				log.Println(err)
+			}
+
+			<-ticker.C
+		}
 	}
+
+}
+
+// checks for cpu groups
+func isCgroupV2() bool {
+	_, err := os.Stat("/sys/fs/cgroup/cgroup.controllers")
+	return err == nil
+}
+
+// reads cgroup v2 cpu
+func readCPUUsageCgroupV2() (uint64, error) {
+	data, err := os.ReadFile("/sys/fs/cgroup/cpu.stat")
+	if err != nil {
+		return 0, err
+	}
+
+	lines := strings.Split(string(data), "\n")
+	for _, line := range lines {
+		if strings.HasPrefix(line, "usage_usec") {
+			parts := strings.Fields(line)
+			if len(parts) == 2 {
+				return strconv.ParseUint(parts[1], 10, 64)
+			}
+		}
+	}
+	return 0, fmt.Errorf("usage_usec not found")
 }
 
 // doesnt make sense - docker already notifies if port is in use
