@@ -205,18 +205,18 @@ func (s *Service) startPerformanceChecks() {
 		memMB := float64(memBytes) / (1024 * 1024) //converting to MB
 		fmt.Printf("Memory usage (MB): %f \n", memMB)
 
+		t1 := time.Now()
 		cpu1, errCpu := readCpu()
 		if errCpu != nil {
 			log.Println("err cpu", errCpu)
 		}
 		log.Println("Cpu1: ", cpu1)
-		t1 := time.Now()
 
 		time.Sleep(5 * time.Second)
 
+		t2 := time.Now()
 		cpu2, _ := readCpu()
 		log.Println("Cpu2: ", cpu2)
-		t2 := time.Now()
 
 		delta := float64(cpu2-cpu1) / 1_000_000.0
 		log.Println("delta cpu: ", delta)
@@ -254,21 +254,12 @@ func (s *Service) startPerformanceChecks() {
 }
 
 func readCpu() (uint64, error) {
-	data, err := os.ReadFile("/sys/fs/cgroup/cpu/cpu.stat")
+	data, err := os.ReadFile("/sys/fs/cgroup/cpuacct/cpuacct.usage")
 	if err != nil {
 		return 0, err
 	}
-
-	lines := strings.Split(string(data), "\n")
-	for _, line := range lines {
-		if strings.HasPrefix(line, "usage_usec") {
-			parts := strings.Fields(line)
-			if len(parts) == 2 {
-				return strconv.ParseUint(parts[1], 10, 64)
-			}
-		}
-	}
-	return 0, fmt.Errorf("usage_usec not found")
+	valStr := strings.TrimSpace(string(data))
+	return strconv.ParseUint(valStr, 10, 64)
 }
 
 // doesnt make sense - docker already notifies if port is in use
