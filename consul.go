@@ -198,9 +198,9 @@ func (s *Service) updateHealthCheck() {
 func (s *Service) startPerformanceChecks() {
 	kv := s.consulClient.KV()
 	time.Sleep(10 * time.Second)
-	ticker := time.NewTicker(time.Second * 30)
+	ticker := time.NewTicker(time.Minute * 3)
 	isV2 := isCgroupV2()
-	if !isV2 {
+	if isV2 {
 		for {
 			log.Println("using v1 calculation method")
 			usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
@@ -251,7 +251,7 @@ func (s *Service) startPerformanceChecks() {
 
 			<-ticker.C
 		}
-	} else {
+	} else if !isV2 {
 		for {
 			log.Println("using v2 calculation method")
 			usage, _ := os.ReadFile("/sys/fs/cgroup/memory/memory.usage_in_bytes")
